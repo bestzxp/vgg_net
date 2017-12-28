@@ -38,7 +38,7 @@ class VGGNet(object):
         self.fc_14 = self.fc_layer('fc14', self.reshape, (self.height//32)*(self.width//32)*256, 1024)
         self.fc_15 = self.fc_layer('fc15', self.fc_14, 1024, 1024)
         self.fc_16 = self.fc_layer('fc16', self.fc_15, 1024, self.num_classes)
-        self.softmax = tf.nn.softmax(tf.reshape(self.fc_16, [-1, self.num_classes]))
+        self.softmax = tf.nn.softmax(tf.reshape(self.fc_16, [-1, self.num_classes]), name='prob')
 
         print(self.softmax)
         return self.softmax
