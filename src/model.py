@@ -34,14 +34,19 @@ class VGGNet(object):
         self.conv_13 = self.conv_layer('conv13', self.conv_12, 512, [3, 3], 1)
         self.pool5 = self.max_pooling('pool5', self.conv_13, [2, 2], 2)
 
-        self.reshape = tf.reshape(self.pool5, [-1, (self.height//32)*(self.width//32)*256])
-        self.fc_14 = self.fc_layer('fc14', self.reshape, (self.height//32)*(self.width//32)*256, 1024)
+        self.reshape = tf.reshape(self.pool5, [-1, (self.height//32)*(self.width//32)*512])
+        self.fc_14 = self.fc_layer('fc14', self.reshape, (self.height//32)*(self.width//32)*512, 1024)
         self.fc_15 = self.fc_layer('fc15', self.fc_14, 1024, 1024)
         self.fc_16 = self.fc_layer('fc16', self.fc_15, 1024, self.num_classes)
         self.softmax = tf.nn.softmax(tf.reshape(self.fc_16, [-1, self.num_classes]), name='prob')
 
         print(self.softmax)
         return self.softmax
+
+    def loss(self):
+        print(self.fc_16)
+        print(self.ground_truth)
+        return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.fc_16, labels=self.ground_truth), name='loss')
 
     def conv_layer(self, name, inputs, filters, kernel_size, stride):
         channels = int(inputs.get_shape()[-1])
@@ -58,7 +63,7 @@ class VGGNet(object):
             conv = tf.nn.conv2d(inputs, kernel, strides=[1, stride, stride, 1], padding='SAME', name=name)
 
             conv_batchnormed = slim.batch_norm(conv, center=False,
-                                               scale=True, epsilon=1e-5, scope=name,
+                                               scale=True, epsilon=1e-5, scope='bn',
                                                is_training=self.training, updates_collections=None)
             conv_biases = tf.nn.bias_add(conv_batchnormed, biases)
             leaky = tf.maximum(conv_biases, conv_biases*0.1, name='leaky')
@@ -76,5 +81,4 @@ class VGGNet(object):
 
         return fc
 
-net = VGGNet([224, 224], 12)
 
