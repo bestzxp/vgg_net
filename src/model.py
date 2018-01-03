@@ -36,8 +36,8 @@ class VGGNet(object):
 
         self.reshape = tf.reshape(self.pool5, [-1, (self.height//32)*(self.width//32)*512])
         self.fc_14 = self.fc_layer('fc14', self.reshape, (self.height//32)*(self.width//32)*512, 1024)
-        self.fc_15 = self.fc_layer('fc15', self.fc_14, 1024, 1024)
-        self.fc_16 = self.fc_layer('fc16', self.fc_15, 1024, self.num_classes)
+        self.fc_15 = self.fc_layer('fc15', self.fc_14, 1024, 100)
+        self.fc_16 = self.fc_layer('fc16', self.fc_15, 100, self.num_classes)
         self.softmax = tf.nn.softmax(tf.reshape(self.fc_16, [-1, self.num_classes]), name='prob')
 
         print(self.softmax)
@@ -48,7 +48,7 @@ class VGGNet(object):
         print(self.ground_truth)
         return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.fc_16, labels=self.ground_truth), name='loss')
 
-    def conv_layer(self, name, inputs, filters, kernel_size, stride):
+    def conv_layer(self, name, inputs, filters, kernel_size, stride, training=True):
         channels = int(inputs.get_shape()[-1])
         print(inputs.shape, channels)
         with tf.variable_scope(name):
@@ -66,6 +66,9 @@ class VGGNet(object):
                                                scale=True, epsilon=1e-5, scope='bn',
                                                is_training=self.training, updates_collections=None)
             conv_biases = tf.nn.bias_add(conv_batchnormed, biases)
+            # if training:
+            #     conv_biases = tf.nn.dropout(conv_biases, 0.7)
+
             leaky = tf.maximum(conv_biases, conv_biases*0.1, name='leaky')
         return leaky
 
@@ -73,12 +76,13 @@ class VGGNet(object):
         return tf.nn.max_pool(inputs, [1, kernel_size[0], kernel_size[1], 1],
                               strides=[1, stride, stride, 1], padding='SAME', name=name)
 
-    def fc_layer(self, name, inputs, num_in, num_out):
+    def fc_layer(self, name, inputs, num_in, num_out, training=True):
         with tf.variable_scope(name):
             weights = tf.get_variable('weights', shape=[num_in, num_out], trainable=self.training)
             biases = tf.get_variable('biases', shape=[num_out], trainable=self.training)
             fc = tf.nn.bias_add(tf.matmul(inputs, weights), biases)
-
+            # if training:
+            #     conv_biases = tf.nn.dropout(fc, 0.7)
         return fc
 
 

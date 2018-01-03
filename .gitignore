@@ -2,3 +2,4 @@
 *.xml
 data/*
 src/__pycache__/*
+ckpt/*
