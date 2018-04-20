@@ -2,25 +2,26 @@ import os
 import numpy as np
 import cv2
 
-classes = ['Black-grass', 'Charlock', 'Cleavers', 'Common Chickweed',
-           'Common wheat', 'Fat Hen', 'Loose Silky-bent', 'Maize',
-           'Scentless Mayweed', 'Shepherds Purse', 'Small-flowered Cranesbill', 'Sugar beet']
+classes = range(1, 129)
 
 class DataLoader(object):
     def __init__(self):
         self.classes = classes
         self.images_urls, self.labels = self.load_all_data()
+        self.valid_urls, self.valid_labels = self.load_all_data(type='valid')
         self.cursor = 0
         self.avg = np.array([[[52.7398061476, 73.6611408516, 83.7255207858]]])
 
+        self.valid_cursor = 0
 
-    def load_all_data(self):
+
+    def load_all_data(self, type='train'):
         img_path_urls = []
         label = []
         for i in range(len(classes)):
-            images = os.listdir('../data/train/{}/'.format(classes[i]))
+            images = os.listdir('../data/{}/{}/'.format(type, classes[i]))
             # print(images)
-            img_path_urls.extend(['../data/train/{}/'.format(classes[i]) + image for image in images])
+            img_path_urls.extend(['../data/{}/{}/'.format(type, classes[i]) + image for image in images])
             label.extend([i]*len(images))
             # print('class {} has {} images'.format(classes[i], len(images)))
         print('\ntotal images num: {}'.format(len(img_path_urls)))
@@ -34,10 +35,22 @@ class DataLoader(object):
         images = np.zeros([batch_size, 224, 224, 3])
         labels = np.zeros([batch_size, len(self.classes)])
         for i in range(batch_size):
-            images[i, :] = (self.get_image(self.images_urls[self.cursor]) - self.avg)
-            labels[i, :] = self.one_hot(self.labels[self.cursor], len(classes))
-            self.cursor += 1
+            if self.cursor < self.images_urls.shape[0]:
+                images[i, :] = (self.get_image(self.images_urls[self.cursor]) - self.avg)
+                labels[i, :] = self.one_hot(self.labels[self.cursor], len(classes))
+                self.cursor += 1
         return images, labels
+
+    def get_valid_batch_data(self, batch_size):
+        images = np.zeros([batch_size, 224, 224, 3])
+        labels = np.zeros([batch_size, len(self.classes)])
+        for i in range(batch_size):
+            if self.valid_cursor < self.valid_urls.shape[0]:
+                images[i, :] = (self.get_image(self.valid_urls[self.valid_cursor]) - self.avg)
+                labels[i, :] = self.one_hot(self.valid_labels[self.valid_cursor], len(classes))
+                self.valid_cursor += 1
+        return images, labels
+
 
     def shuffle(self):
         perm = np.arange(len(self.images_urls))

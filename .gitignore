@@ -3,3 +3,5 @@
 data/*
 src/__pycache__/*
 ckpt/*
+log_train/*
+log_valid/*

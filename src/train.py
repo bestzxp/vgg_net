@@ -1,42 +1,66 @@
 import tensorflow as tf
-from src.model import VGGNet
-from src.data_loader import DataLoader
-net = VGGNet([224, 224], 12)
+import sys
+from model import VGGNet
+from data_loader import DataLoader
+net = VGGNet([224, 224], 128)
 net.build()
 loss = net.loss()
 # print(tf.global_variables())
+ckpt_path = '../ckpt/model.ckpt-0'
+
 loader = DataLoader()
-# 166.111.83.102
 
-pred_label = tf.argmax(net.softmax)
-truth_label = tf.argmax(net.ground_truth)
-correct_prediction = tf.equal(pred_label, truth_label)
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-# learning_rate = tf.train.exponential_decay(0.00001, global_step, 15,
-#             0.9, name='learning_rate')
-optimizer = tf.train.GradientDescentOptimizer(0.00001).minimize(loss)
+sess = tf.Session()
+optimizer = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(loss)
 saver = tf.train.Saver(tf.global_variables(), max_to_keep=None)
+
+ls = tf.summary.scalar('loss', loss)
+
+train_writer = tf.summary.FileWriter('../log_train', sess.graph)
+valid_writer = tf.summary.FileWriter('../log_valid', sess.graph)
 
 batch = 32
 batch_num = loader.images_urls.shape[0] // batch
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.8
-with tf.Session(config=config) as sess:
+# config = tf.ConfigProto()
+# config.gpu_options.per_process_gpu_memory_fraction = 0.7
+valid_batch_num = loader.valid_urls.shape[0] // batch
+
+if ckpt_path:
+    saver.restore(sess, ckpt_path)
+else:
     sess.run(tf.global_variables_initializer())
-    saver.restore(sess, '../ckpt/model.ckpt')
-    for i in range(100000):
-        total_loss = 0
-        total_ac = 0
-        for _ in range(batch_num):
-            res = loader.get_batch_data(batch)
-            feed_dicts = {net.inputs: res[0], net.ground_truth: res[1]}
-            # sess.run(optimizer, feed_dict=feed_dicts)
-            _, l, a = sess.run([optimizer, loss, accuracy], feed_dict=feed_dicts)
-            print('    ', l, a)
-            total_loss += l
-            total_ac += a
-        print(i, total_loss, total_ac / batch_num)
-        loader.shuffle()
-        if i % 5 == 0:
-            saver.save(sess, '../ckpt/model.ckpt', i)
+
+global_step = 0
+valid_step = 0
+for i in range(100000):
+
+    total_loss = 0
+    for idx in range(valid_batch_num):
+        valid_step += 1
+        res = loader.get_valid_batch_data(batch)
+        feed_dicts = {net.inputs: res[0], net.ground_truth: res[1]}
+        # sess.run(optimizer, feed_dict=feed_dicts)
+        ls_, l = sess.run([ls, loss], feed_dict=feed_dicts)
+        total_loss += l
+        valid_writer.add_summary(ls_, valid_step)
+        sys.stdout.write("\r-valid epoch:%3d, idx:%4d, loss: %0.6f" % (i, idx, l))
+    loader.valid_cursor = 0
+    print("\nepoch:{}, valid avg_loss:{}".format(i, total_loss / valid_batch_num))
+
+
+    total_loss = 0
+    for idx in range(batch_num):
+        global_step += 1
+        res = loader.get_batch_data(batch)
+        feed_dicts = {net.inputs: res[0], net.ground_truth: res[1]}
+        # sess.run(optimizer, feed_dict=feed_dicts)
+        _, ls_, l = sess.run([optimizer, ls, loss], feed_dict=feed_dicts)
+        total_loss+=l
+        train_writer.add_summary(ls_, global_step)
+        sys.stdout.write("\r-train epoch:%3d, idx:%4d, loss: %0.6f" % (i, idx, l))
+    print("\nepoch:{}, train avg_loss:{}".format(i, total_loss/batch_num))
+    saver.save(sess, '../ckpt/model_{}.ckpt'.format(i))
+
+
+    loader.shuffle()
+
